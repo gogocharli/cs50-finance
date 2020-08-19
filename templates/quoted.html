@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+
+{% block main %}
+    <table class="table table-hover">
+        <thead class="thead-dark">
+            <tr>
+                <th scope="col">Company</th>
+                <th scope="col">Symbol</th>
+                <th scope="col">Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>{{ symbol }}</td>
+                <td>{{ name }}</td>
+                <td>{{ price | usd }}</td>
+            </tr>
+        </tbody>
+    </table>
+{% endblock %}

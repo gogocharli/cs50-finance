@@ -119,7 +119,24 @@ def logout():
 @login_required
 def quote():
     """Get stock quote."""
-    return apology("TODO")
+
+    if request.method == "POST":
+        symbol = request.form.get("symbol")
+
+        # Make sure there is symbol in the form
+        if not symbol:
+            return apology("must provide symbol", 403)
+
+        # Lookup the symbol and return the quoted template
+        quoteDict = lookup(symbol)
+        return render_template(
+            "quoted.html",
+            name=quoteDict["name"],
+            price=quoteDict["price"],
+            symbol=quoteDict["symbol"],
+        )
+
+    return render_template("quote.html")
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -160,7 +177,7 @@ def register():
 
         # If the user exists, redirect to login also
         else:
-            flash("User already exist, try to login in instead")
+            flash("User already exists, try to login instead")
             return render_template("login.html")
 
     return render_template("register.html")
