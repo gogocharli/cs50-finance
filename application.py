@@ -23,6 +23,7 @@ def after_request(response):
     response.headers["Pragma"] = "no-cache"
     return response
 
+
 # Custom filter
 app.jinja_env.filters["usd"] = usd
 
@@ -80,17 +81,22 @@ def login():
             return apology("must provide password", 403)
 
         # Query database for username
-        rows = db.execute("SELECT * FROM users WHERE username = :username",
-                          username=request.form.get("username"))
+        rows = db.execute(
+            "SELECT * FROM users WHERE username = :username",
+            username=request.form.get("username"),
+        )
 
         # Ensure username exists and password is correct
-        if len(rows) != 1 or not check_password_hash(rows[0]["hash"], request.form.get("password")):
+        if len(rows) != 1 or not check_password_hash(
+            rows[0]["hash"], request.form.get("password")
+        ):
             return apology("invalid username and/or password", 403)
 
         # Remember which user has logged in
         session["user_id"] = rows[0]["id"]
 
         # Redirect user to home page
+        flash("You are successfuly logged in")
         return redirect("/")
 
     # User reached route via GET (as by clicking a link or via redirect)
@@ -119,7 +125,45 @@ def quote():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     """Register user"""
-    return apology("TODO")
+
+    # Forget any user_id
+    session.clear()
+
+    if request.method == "POST":
+
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        # Ensure username and password fields were submitted
+        if not username:
+            return apology("must provide username", 403)
+        elif not password:
+            return apology("must provide password", 403)
+
+        # Hash the password
+        hash = generate_password_hash(password)
+
+        # Make sure this username, combination doesn't exist
+        rows = db.execute(
+            "SELECT * FROM users WHERE username = :username", username=username
+        )
+
+        if len(rows) == 0:
+            # Create user
+            db.execute(
+                "INSERT INTO users (username, hash) VALUES(:username, :hash)",
+                username=username,
+                hash=hash,
+            )
+            flash("Your account has been created successfuly")
+            return render_template("login.html")
+
+        # If the user exists, redirect to login also
+        else:
+            flash("User already exist, try to login in instead")
+            return render_template("login.html")
+
+    return render_template("register.html")
 
 
 @app.route("/sell", methods=["GET", "POST"])
