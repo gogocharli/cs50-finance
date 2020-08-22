@@ -52,7 +52,97 @@ def index():
 @login_required
 def buy():
     """Buy shares of stock"""
-    return apology("TODO")
+
+    type = "BUY"
+
+    if request.method == "POST":
+
+        symbol = request.form.get("symbol")
+        shares = int(request.form.get("shares"))
+
+        # Ensure that both fields are valid
+        if not symbol:
+            return apology("must provide symbol", 403)
+        elif not shares:
+            return apology("must provide number of shares", 403)
+        elif int(shares) < 1:
+            return apology("number of shares must be greater than 1", 403)
+
+        # Lookup the specified share price
+        stockInfo = lookup(symbol)
+
+        # Verify it exists in the iex database
+        if not stockInfo:
+            return apology(f"could not find price information about {symbol}", 404)
+
+        # Calculate the price of the transaction
+        cost = int(stockInfo["price"]) * int(shares)
+
+        # Make sure the user has enough for the transaction
+        rows = db.execute(
+            "SELECT cash FROM users WHERE id = :id", id=session["user_id"]
+        )
+        liquidity = int(rows[0]["cash"])
+
+        if liquidity >= cost:
+            # Write down the transaction inside the transactions table
+            db.execute(
+                "INSERT INTO transactions (type, symbol, shares, price) VALUES (:type, :symbol, :shares, :price)",
+                type=type,
+                symbol=symbol,
+                shares=shares,
+                price=int(stockInfo["price"]),
+            )
+
+            # Register the last transaction in the trades table and associate it with the user id
+            lastTransaction = db.execute(
+                "SELECT id FROM transactions ORDER BY id DESC LIMIT 1"
+            )
+
+            db.execute(
+                "INSERT INTO trades (trade_id, user_id) VALUES (:transaction, :user)",
+                transaction=lastTransaction[0]["id"],
+                user=session["user_id"],
+            )
+
+            # Update the current stocks of the user in the stocks table
+            trades = db.execute(
+                "SELECT symbol FROM stocks WHERE symbol = :symbol AND user_id = :id",
+                symbol=symbol,
+                id=session["user_id"],
+            )
+
+            # If the symbol is not there, create it and add the number of shares
+            if len(trades) == 0:
+                db.execute(
+                    "INSERT INTO stocks (user_id, symbol, shares) VALUES (:user, :symbol, :shares)",
+                    user=session["user_id"],
+                    symbol=symbol,
+                    shares=shares,
+                )
+            # Otherwise, increase by the number of shares
+            else:
+                db.execute(
+                    "UPDATE stocks SET shares = shares + :shares WHERE symbol = :symbol AND user_id = :id",
+                    shares=shares,
+                    symbol=symbol,
+                    id=session["user_id"],
+                )
+
+            # Update the value of the user's cash to the new balance after the transaction
+            balance = liquidity - cost
+            db.execute(
+                "UPDATE users SET cash = :cash WHERE id = :id",
+                cash=balance,
+                id=session["user_id"],
+            )
+            # Redirect user to the index screen
+            flash("Stocks purchased successfuly")
+            return redirect("/")
+        else:
+            return apology("you do not have enough cash for this transaction", 401)
+
+    return render_template("buy.html")
 
 
 @app.route("/history")
@@ -128,12 +218,17 @@ def quote():
             return apology("must provide symbol", 403)
 
         # Lookup the symbol and return the quoted template
-        quoteDict = lookup(symbol)
+        stockInfo = lookup(symbol)
+
+        # Inform the user if we couldn't find the symbol
+        if stockInfo == None:
+            return apology(f"couldn't find price for {symbol}", 404)
+
         return render_template(
             "quoted.html",
-            name=quoteDict["name"],
-            price=quoteDict["price"],
-            symbol=quoteDict["symbol"],
+            name=stockInfo["name"],
+            price=stockInfo["price"],
+            symbol=stockInfo["symbol"],
         )
 
     return render_template("quote.html")
