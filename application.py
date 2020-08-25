@@ -45,7 +45,44 @@ if not os.environ.get("API_KEY"):
 @login_required
 def index():
     """Show portfolio of stocks"""
-    return apology("TODO")
+
+    # List the available stocks for the user
+    stocks = db.execute(
+        "SELECT symbol, shares FROM stocks WHERE user_id = :id", id=session["user_id"]
+    )
+
+    stockList = []
+    stockTotal = 0
+
+    # Create an object for each owned stock
+    for stock in stocks:
+        stockInfo = lookup(stock["symbol"])
+        total = stock["shares"] * stockInfo["price"]
+
+        stockList.append(
+            {
+                "symbol": stock["symbol"],
+                "name": stockInfo["name"],
+                "shares": stock["shares"],
+                "currentPrice": stockInfo["price"],
+                "total": total,
+            }
+        )
+
+        # Increment the total amount owned
+        stockTotal += total
+
+    # Calculate cash and total balance
+    userInfo = db.execute(
+        "SELECT cash FROM users WHERE id = :id", id=session["user_id"]
+    )
+
+    cash = userInfo[0]["cash"]
+    balance = cash + stockTotal
+
+    return render_template(
+        "index.html", stockList=stockList, cash=cash, balance=balance
+    )
 
 
 @app.route("/buy", methods=["GET", "POST"])
@@ -282,7 +319,86 @@ def register():
 @login_required
 def sell():
     """Sell shares of stock"""
-    return apology("TODO")
+
+    if request.method == "POST":
+        type = "SELL"
+
+        symbol = request.form.get("symbol")
+        shares = int(request.form.get("shares"))
+
+        # Ensure that both fields are valid
+        if not symbol:
+            return apology("must provide symbol", 403)
+        elif not shares:
+            return apology("must provide number of shares", 403)
+        elif int(shares) < 1:
+            return apology("number of shares must be greater than 1", 403)
+
+        # Get the stock's info
+        stockInfo = lookup(symbol)
+
+        # Verify that the user has the amount of stock they submited
+        userOwned = db.execute(
+            "SELECT shares FROM stocks WHERE user_id = :id AND symbol = :symbol",
+            id=session["user_id"],
+            symbol=symbol,
+        )
+
+        userShares = userOwned[0]["shares"]
+        if userShares < shares:
+            return apology("You do not possess enough shares for this operation", 403)
+        else:
+            # Create a transaction for the trade
+            db.execute(
+                "INSERT INTO transactions (type, symbol, shares, price) VALUES (:type, :symbol, :shares, :price)",
+                type=type,
+                symbol=symbol,
+                shares=shares,
+                price=int(stockInfo["price"]),
+            )
+
+            # Register the last transaction in the trades table and associate it with the user id
+            lastTransaction = db.execute(
+                "SELECT id FROM transactions ORDER BY id DESC LIMIT 1"
+            )
+
+            db.execute(
+                "INSERT INTO trades (trade_id, user_id) VALUES (:transaction, :user)",
+                transaction=lastTransaction[0]["id"],
+                user=session["user_id"],
+            )
+
+            # Update the user's stock
+            db.execute(
+                "UPDATE stocks SET shares = shares - :shares WHERE symbol = :symbol AND user_id = :id",
+                shares=shares,
+                symbol=symbol,
+                id=session["user_id"],
+            )
+
+            # Update the user's cash balance
+            revenue = shares * stockInfo["price"]
+            db.execute(
+                "UPDATE users SET cash = cash + :revenue WHERE id = :id",
+                revenue=revenue,
+                id=session["user_id"],
+            )
+
+            # Redirect user to the index screen
+            flash("Stocks sold successfuly")
+            return redirect("/")
+
+    else:
+        # List the available stocks for the user
+        stocks = db.execute(
+            "SELECT symbol FROM stocks WHERE user_id = :id", id=session["user_id"]
+        )
+
+        stockList = []
+        for stock in stocks:
+            stockList.append(stock["symbol"])
+
+        return render_template("sell.html", stocks=stockList)
 
 
 def errorhandler(e):
