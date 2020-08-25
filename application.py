@@ -186,7 +186,25 @@ def buy():
 @login_required
 def history():
     """Show history of transactions"""
-    return apology("TODO")
+    # Get all the details from the database
+    trades = db.execute(
+        "SELECT type, symbol, shares, price, timestamp FROM transactions WHERE id IN(SELECT trade_id FROM trades WHERE user_id = :id)",
+        id=session["user_id"],
+    )
+
+    # Retrieve the details and send them in the template
+    history = []
+    for trade in trades:
+        tradeDetails = {
+            "type": trade["type"],
+            "symbol": trade["symbol"],
+            "shares": trade["shares"],
+            "price": trade["price"],
+            "dateTime": trade["timestamp"],
+        }
+        history.append(tradeDetails)
+
+    return render_template("history.html", history=history)
 
 
 @app.route("/login", methods=["GET", "POST"])

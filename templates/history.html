@@ -1,22 +1,28 @@
 {% extends "layout.html" %}
 
+{% block title %}
+    History
+{% endblock %}
+
 {% block main %}
     <table class="table table-hover">
         <thead class="thead-dark">
             <tr>
+                <th scope="col">Transaction</th>
                 <th scope="col">Symbol</th>
                 <th scope="col">Shares</th>
                 <th scope="col">Price</th>
-                <th scope="col">Date</th>
+                <th scope="col">Date &amp; Time</th>
             </tr>
         </thead>
         <tbody>
             {% for item in history %}
-                <tr>
-                <th scope="row">{{ item.symbol }}</td>
+            <tr>
+                <th scope="row">{{ item.type }}</th>
+                <td>{{ item.symbol }}</td>
                 <td>{{ item.shares }}</td>
                 <td>{{ item.price | usd }}</td>
-                <td>{{ item.date}}</td>
+                <td>{{ item.dateTime}}</td>
             </tr>
             {% endfor %}
         </tbody>
