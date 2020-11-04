@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+
+{% block title %}
+{{ username }}'s Profile
+{% endblock %}
+
+{% block main %}
+<!-- Display info about the user -->
+<h1>Welcome {{ username }}!</h1>
+<img src="/static/profile-placeholder.png" alt="" style="width: 10em;">
+<h2>Profile Information</h2>
+<ul>
+    <li>Username: {{ username }}</li>
+    <li>Email: {{email if email else "no email"}}</li>
+</ul>
+<a href="/password">Change password</a>
+
+<h2>Assets</h2>
+<table class="table table-hover">
+    <thead class="thead-dark">
+        <tr>
+            <th scope="col">Earned</th>
+            <th scope="col">Spent</th>
+            <th scope="col">Balance</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>{{ funds.earned | usd }}</td>
+            <td>{{ funds.spent | usd }}</td>
+            <td>{{ funds.cash | usd }}</td>
+        </tr>
+    </tbody>
+</table>
+
+{% endblock %}

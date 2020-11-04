@@ -56,6 +56,10 @@ def index():
 
     # Create an object for each owned stock
     for stock in stocks:
+        # Skip previously onwed stocks
+        if stock["shares"] <= 0:
+            continue
+
         stockInfo = lookup(stock["symbol"])
         total = stock["shares"] * stockInfo["price"]
 
@@ -298,7 +302,7 @@ def register():
 
     if request.method == "POST":
 
-        username = request.form.get("username")
+        username = request.form.get("username").lower()
         password = request.form.get("password")
 
         # Ensure username and password fields were submitted
@@ -331,6 +335,79 @@ def register():
             return render_template("login.html")
 
     return render_template("register.html")
+
+
+@app.route("/profile", methods=["GET"])
+@login_required
+def profile():
+    """Display general user information"""
+    # Funds derive from the history and represent the amount of money
+    # Earned, spent, and owned by the user
+    # Get the transaction history from the user
+    # Buys are considered as spent
+    # Sells are considered as owned
+    # Owned is simply the current cash
+    # Get all the details from the database
+    trades = db.execute(
+        "SELECT type, shares, price, timestamp FROM transactions WHERE id IN(SELECT trade_id FROM trades WHERE user_id = :id)",
+        id=session["user_id"],
+    )
+
+    userInfo = db.execute(
+        "SELECT cash FROM users WHERE id = :id", id=session["user_id"]
+    )
+
+    spent = 0
+    earned = 0
+    for trade in trades:
+        transactionAmount = trade["shares"] * trade["price"]
+        if trade["type"] == "BUY":
+            spent += transactionAmount
+        elif trade["type"] == "SELL":
+            earned += transactionAmount
+
+    funds = {
+        "cash": userInfo[0]["cash"],
+        "earned": earned,
+        "spent": spent,
+    }
+
+    return render_template("profile.html", username="Cody", funds=funds)
+
+
+@app.route("/password", methods=["GET", "POST"])
+@login_required
+def password():
+    """"Change password"""
+
+    if request.method == "POST":
+        id = session["user_id"]
+        # Validate the input
+        currentPassword = request.form.get("currentPassword")
+        newPassword = request.form.get("newPassword")
+
+        if not currentPassword:
+            return apology("400", "Please provide your currrent password")
+
+        if not newPassword:
+            return apology("400", "Please provide a new password")
+
+        # Check if the currentPassword entered is correct
+        # Query database for the current user's password
+        userInfo = db.execute("SELECT hash FROM users WHERE id = :id", id=id,)
+
+        if not check_password_hash(userInfo[0]["hash"], currentPassword):
+            return apology("400", "Your password is incorrect, please try again")
+
+        # Hash newPassword and enter into database
+        hash = generate_password_hash(newPassword)
+
+        db.execute("UPDATE users SET hash = :hash WHERE id = :id", hash=hash, id=id)
+
+        flash("Your password has been successfuly updated")
+        return redirect("/")
+    else:
+        return render_template("password.html")
 
 
 @app.route("/sell", methods=["GET", "POST"])
